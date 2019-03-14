@@ -1,43 +1,59 @@
 import json
-import sys
-from urllib import request, error
+from urllib import request
 
 baseUrl = 'http://localhost:15672'
 username = 'guest'
 password = 'guest'
 
-def check(url):
+exchange_list = [
+    'amq.direct',
+    'amq.fanout',
+    'test.exchange'
+]
+queue_list = [
+    'test.ly34732',
+    'demo'
+]
+
+
+def get_items(type):
+    url = '{0}/api/{1}/{2}/'.format(baseUrl, type, '%2f')
+
     password_mgr = request.HTTPPasswordMgrWithDefaultRealm()
     password_mgr.add_password(None, baseUrl, username, password)
     handler = request.HTTPBasicAuthHandler(password_mgr)
     req = request.Request(url)
     opener = request.build_opener(handler)
 
+    res = opener.open(req).read().decode('utf-8', errors='ignore')
+    items = [x['name'] for x in json.loads(res)]
+    return set(items)
+
+def check_alive():
     try:
-        res = opener.open(req).read().decode('utf-8', errors='ignore')
-        obj = json.loads(res)
-        return 'OK'
-    except error.HTTPError as e:
-        if e.code == 404:
-            return 'Target Not Found'
+        exchange_set = get_items('exchanges')
+        queue_set = get_items('queues')
+
+        print('Row, Type, Name, Status')
+        # print exchange status
+        for i, e in enumerate(exchange_list):
+            print('{}, exchange, {}, {}'.format(
+                i + 1,
+                e,
+                'OK' if e in exchange_set else 'Not Found'
+            ))
+        #print queue status
+        for i, q in enumerate(queue_list):
+            print('{}, queue, {}, {}'.format(
+                i + len(exchange_list) + 1,
+                q,
+                'OK' if q in queue_set else 'Not Found'
+            ))
+
     except Exception as ex:
-        return ex
-
-def check_exchange(exchange_name):
-    url = baseUrl + '/api/exchanges/%2f/' + exchange_name
-    return check(url)
-
-def check_queue(quene_name):
-    url = baseUrl + '/api/queues/%2f/' + quene_name
-    return check(url)
+        print('Row, Type, Name, Status')
+        print('1, NA, NA, {}'.format(ex))
 
 
 if __name__ == '__main__':
-    arg = sys.argv[1]
-    item = sys.argv[2]
-    if arg == '-e':
-        print(check_exchange(item))
-    elif arg == '-q':
-        print(check_queue(item))
-    else:
-        raise Exception('arguments error.')
+    check_alive()
